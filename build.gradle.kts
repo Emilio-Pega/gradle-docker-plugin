@@ -4,6 +4,7 @@ import java.util.Date
 plugins {
     groovy
     `java-gradle-plugin`
+    `maven-publish`
     id("com.gradle.plugin-publish") version "0.14.0"
     `build-scan`
     com.bmuschko.gradle.docker.`test-setup`
@@ -17,6 +18,7 @@ plugins {
     com.bmuschko.gradle.docker.release
 }
 
+version = "7.1.0-pega"
 group = "com.bmuschko"
 
 repositories {
@@ -37,7 +39,13 @@ dependencies {
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType<GroovyCompile> {
+    options.compilerArgs.add("-Xlint:-options")
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
 }
 
 tasks.named<Jar>("jar") {
@@ -93,5 +101,14 @@ buildScan {
     if (!System.getenv("CI").isNullOrEmpty()) {
         publishAlways()
         tag("CI")
+    }
+}
+afterEvaluate {
+    publishing {
+        publications {
+            named<MavenPublication>("pluginMaven") {
+                setArtifacts(listOf(project.file("gradle.properties")))
+            }
+        }
     }
 }
