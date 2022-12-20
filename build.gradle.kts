@@ -5,17 +5,18 @@ plugins {
     groovy
     `java-gradle-plugin`
     `maven-publish`
-    id("com.gradle.plugin-publish") version "0.14.0"
-    `build-scan`
-    com.bmuschko.gradle.docker.`test-setup`
-    com.bmuschko.gradle.docker.`integration-test`
-    com.bmuschko.gradle.docker.`functional-test`
-    com.bmuschko.gradle.docker.`doc-test`
-    com.bmuschko.gradle.docker.`additional-artifacts`
+    //id("com.gradle.plugin-publish") version "0.14.0"
+//    `build-scan`
+//    com.bmuschko.gradle.docker.`test-setup`
+//    com.bmuschko.gradle.docker.`integration-test`
+//    com.bmuschko.gradle.docker.`functional-test`
+//    com.bmuschko.gradle.docker.`doc-test`
+//    com.bmuschko.gradle.docker.`additional-artifacts`
     com.bmuschko.gradle.docker.`shaded-artifacts`
-    com.bmuschko.gradle.docker.`user-guide`
-    com.bmuschko.gradle.docker.documentation
-    com.bmuschko.gradle.docker.release
+    //com.bmuschko.gradle.docker.`user-guide`
+    //com.bmuschko.gradle.docker.documentation
+    //com.bmuschko.gradle.docker.release
+    id("com.jfrog.artifactory") version "4.7.5"
 }
 
 version = "7.1.0-pega"
@@ -82,33 +83,42 @@ gradlePlugin {
     }
 }
 
-pluginBundle {
-    website = "https://github.com/bmuschko/gradle-docker-plugin"
-    vcsUrl = "https://github.com/bmuschko/gradle-docker-plugin"
-    tags = listOf("gradle", "docker", "container", "image", "lightweight", "vm", "linux")
-
-    mavenCoordinates {
-        groupId = project.group.toString()
-        artifactId = project.name
-        version = project.version.toString()
-    }
-}
-
-buildScan {
-    termsOfServiceUrl = "https://gradle.com/terms-of-service"
-    termsOfServiceAgree = "yes"
-
-    if (!System.getenv("CI").isNullOrEmpty()) {
-        publishAlways()
-        tag("CI")
-    }
-}
+//pluginBundle {
+//    website = "https://github.com/bmuschko/gradle-docker-plugin"
+//    vcsUrl = "https://github.com/bmuschko/gradle-docker-plugin"
+//    tags = listOf("gradle", "docker", "container", "image", "lightweight", "vm", "linux")
+//
+//    mavenCoordinates {
+//        groupId = project.group.toString()
+//        artifactId = project.name
+//        version = project.version.toString()
+//    }
+//}
+//
+//buildScan {
+//    termsOfServiceUrl = "https://gradle.com/terms-of-service"
+//    termsOfServiceAgree = "yes"
+//
+//    if (!System.getenv("CI").isNullOrEmpty()) {
+//        publishAlways()
+//        tag("CI")
+//    }
+//}
 afterEvaluate {
     publishing {
         publications {
             named<MavenPublication>("pluginMaven") {
-                setArtifacts(listOf(project.file("gradle.properties")))
+                setArtifacts(listOf(project.tasks.shadowJar.map {
+                    project.file("${project.buildDir}/libs/gradle-docker-plugin-7.1.0-pega.jar")
+                }))
             }
         }
     }
+    publishing.publications.map { it.name }.forEach {
+        val pubName = it
+        project.tasks.artifactoryPublish {
+            publications(pubName)
+        }
+    }
 }
+apply(from = "artifactory.gradle")

@@ -1,0 +1,11 @@
+artifactory {
+    contextUrl = project.artifactoryURL
+    publish {
+        repository {
+            repoKey = 'plugins-release-local'
+            username = project.artifactoryUser
+            password = project.artifactoryPassword
+            mavenCompatible = true
+        }
+    }
+}
