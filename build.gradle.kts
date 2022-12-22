@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -5,19 +6,50 @@ import java.util.Date
 plugins {
     groovy
     `java-gradle-plugin`
-    alias(libs.plugins.plugin.publish)
-    com.bmuschko.gradle.docker.`test-setup`
-    com.bmuschko.gradle.docker.`integration-test`
-    com.bmuschko.gradle.docker.`functional-test`
-    com.bmuschko.gradle.docker.`doc-test`
-    com.bmuschko.gradle.docker.`additional-artifacts`
-    com.bmuschko.gradle.docker.`shaded-artifacts`
-    com.bmuschko.gradle.docker.`user-guide`
-    com.bmuschko.gradle.docker.documentation
-    com.bmuschko.gradle.docker.release
+    `maven-publish`
+    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("com.jfrog.artifactory") version "4.30.1"
 }
 
 group = "com.bmuschko"
+version = "9.0.1-pega"
+
+
+val shaded by configurations.creating
+val implementation = configurations.getByName("implementation")
+implementation.extendsFrom(shaded)
+
+val packagesToRelocate = listOf(
+    "javassist",
+    "org.glassfish",
+    "org.jvnet",
+    "jersey.repackaged",
+    "com.fasterxml",
+    "io.netty",
+    "org.bouncycastle",
+    "org.apache",
+    "org.aopalliance",
+    "org.scijava",
+    "com.google",
+    "javax.annotation",
+    "javax.ws",
+    "net.sf",
+    "org.objectweb",
+    "javax.activation"
+)
+
+tasks.named<ShadowJar>("shadowJar") {
+    archiveClassifier.set(null as String?)
+    configurations = listOf(shaded)
+    mergeServiceFiles()
+    for (pkg in packagesToRelocate) {
+        relocate(pkg, "com.bmuschko.gradle.docker.shaded.$pkg")
+    }
+}
+
+val jar: Jar by tasks
+jar.enabled = false
+tasks["assemble"].dependsOn(tasks.shadowJar)
 
 repositories {
     mavenCentral()
@@ -31,12 +63,19 @@ dependencies {
         exclude(group = "org.codehaus.groovy")
     }
     testImplementation(libs.zt.zip)
-    functionalTestImplementation(libs.commons.vfs2)
+    //functionalTestImplementation(libs.commons.vfs2)
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType<GroovyCompile> {
+    options.compilerArgs.add("-Xlint:-options")
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+    groovyOptions.optimizationOptions?.put("all", false)
 }
 
 tasks.named<Jar>("jar") {
@@ -73,24 +112,19 @@ gradlePlugin {
     }
 }
 
-pluginBundle {
-    website = "https://github.com/bmuschko/gradle-docker-plugin"
-    vcsUrl = "https://github.com/bmuschko/gradle-docker-plugin"
-    tags = listOf("gradle", "docker", "container", "image", "lightweight", "vm", "linux")
-
-    mavenCoordinates {
-        groupId = project.group.toString()
-        artifactId = project.name
-        version = project.version.toString()
+afterEvaluate {
+    publishing {
+        publications {
+            named<MavenPublication>("pluginMaven") {
+                setArtifacts(listOf(project.tasks.shadowJar))
+            }
+        }
+    }
+    publishing.publications.map { it.name }.forEach {
+        val pubName = it
+        project.tasks.artifactoryPublish {
+            publications(pubName)
+        }
     }
 }
-
-buildScan {
-    termsOfServiceUrl = "https://gradle.com/terms-of-service"
-    termsOfServiceAgree = "yes"
-
-    if (!System.getenv("CI").isNullOrEmpty()) {
-        publishAlways()
-        tag("CI")
-    }
-}
+apply(from = "artifactory.gradle")

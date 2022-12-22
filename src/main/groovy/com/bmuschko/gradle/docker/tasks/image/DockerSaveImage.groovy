@@ -127,7 +127,7 @@ class DockerSaveImage extends AbstractDockerRemoteApiTask {
                 os = new GZIPOutputStream(fs)
             }
             try {
-                image.transferTo(os)
+                IOUtils.copy(image, os)
             } catch (IOException e) {
                 throw new GradleException("Can't save image.", e)
             } finally {
